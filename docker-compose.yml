@@ -1,0 +1,59 @@
+version: '3'
+services:
+  mysql:
+    container_name: mysql
+    build: ./db
+    volumes:
+      - ./db/mysql_init:/docker-entrypoint-initdb.d
+      - ./db/mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    ports:
+      - 3306:3306
+  api:
+    container_name: api
+    build: ./api
+    volumes:
+      - ./api:/usr/src/api
+    working_dir: /usr/src/api
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASS=password
+      - DB_NAME=sample_db
+    # depends_on:
+    #   - mysql
+    command: sh -c "npm install && npm run start"
+  client:
+    container_name: client
+    build: ./client
+    volumes:
+      - ./client:/usr/src/client
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+      - baseURL=http://nginx
+      - browserBaseURL=http://localhost:8080
+    working_dir: /usr/src/client
+    command: sh -c "npm install && npm run dev"
+  nginx:
+    container_name: nginx
+    image: nginx
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    environment:
+      - API_HOST=api
+      - API_PORT=3000
+      - CLIENT_HOST=client
+      - CLIENT_PORT=3000
+    ports:
+      - 3000:80
+    # depends_on:
+    #   - api
+    #   - client
+    command: >
+      sh -c
+      "envsubst '$$API_HOST $$API_PORT $$CLIENT_HOST $$CLIENT_PORT' <
+      /etc/nginx/conf.d/default.conf.template >
+      /etc/nginx/conf.d/default.conf &&
+      nginx -g 'daemon off;'"
